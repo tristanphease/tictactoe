@@ -69,14 +69,14 @@ pub fn start_server(server: Server) {
 
     let server_arc = Arc::new(Mutex::new(server));
     
-    for stream in listener.incoming() {
+    'listen: for stream in listener.incoming() {
 
         let stream = stream.unwrap();
         let block_res = stream.set_nonblocking(true);
         if block_res.is_err() {panic!("Couldn't set to blocking");}
 
         let mut websocket_res = accept(stream);
-        if websocket_res.is_err() {
+        while websocket_res.is_err() {
             let error = websocket_res.unwrap_err();
             match error {
                 HandshakeError::Interrupted(mid) => {
@@ -85,7 +85,7 @@ pub fn start_server(server: Server) {
                 },
                 HandshakeError::Failure(_) => {
                     //failed, so just continue
-                    continue;
+                    continue 'listen;
                 },
             }
         }
