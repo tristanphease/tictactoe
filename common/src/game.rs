@@ -204,10 +204,12 @@ impl Board {
         }
 
         //check diagonals
+        //top left to bottom right diagonal
         let first_mark = self.array[0];
         if first_mark != Mark::Empty {
             let mut count = 1;
-            for (x, y) in (1..BOARD_SIZE).enumerate() {
+            for x in 1..BOARD_SIZE {
+                let y = x;
                 if self.array[y*3 + x] == first_mark {
                     count += 1;
                 }
@@ -217,10 +219,12 @@ impl Board {
             }
         }
 
+        //from top right to bottom left
         let first_mark = self.array[BOARD_SIZE-1];
         if first_mark != Mark::Empty {
             let mut count = 1;
-            for (y, x) in (1..BOARD_SIZE).rev().enumerate() {
+            for x in (0..BOARD_SIZE-1).rev() {
+                let y = BOARD_SIZE - 1 - x;
                 if self.array[y*3 + x] == first_mark {
                     count += 1;
                 }

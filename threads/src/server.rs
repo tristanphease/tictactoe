@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use std::collections::HashMap;
 
-use tungstenite::{server::accept};
+use tungstenite::{HandshakeError, server::accept};
 use tungstenite::error::Error;
 use tungstenite::Message;
 use tungstenite::protocol::WebSocket;
@@ -75,10 +75,19 @@ pub fn start_server(server: Server) {
         let block_res = stream.set_nonblocking(true);
         if block_res.is_err() {panic!("Couldn't set to blocking");}
 
-        let websocket_res = accept(stream);
+        let mut websocket_res = accept(stream);
         if websocket_res.is_err() {
-            println!("{:?}", websocket_res);
-            continue;
+            let error = websocket_res.unwrap_err();
+            match error {
+                HandshakeError::Interrupted(mid) => {
+                    println!("Interrupted so restarting");
+                    websocket_res = mid.handshake();
+                },
+                HandshakeError::Failure(_) => {
+                    //failed, so just continue
+                    continue;
+                },
+            }
         }
         let websocket = websocket_res.unwrap();
 
