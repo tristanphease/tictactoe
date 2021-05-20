@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+}
+
+canvas {
+    display: inline-block;
+    /*border: 1px solid black;*/
+}
+
+#info-box {
+    display: inline-block;
+    border: 1px solid black;
+    width: 300px;
+    height: 500px;
+    overflow: auto;
+}
+
+#reconnect-button {
+    display: inline-block;
+    width: 100px;
+    height: 50px;
+    background-color: rgb(194, 187, 187);
+    border: 1px solid black;
+}
+
+#reconnect-button:hover {
+    background-color: rgb(80, 79, 79);
+    color: white;
+    border: white;
+}
+
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+<div id="info-box">
+
+
+
+</div>
+<button id="reconnect-button">Reconnect</button>
+<script>
+
+//very basic client
+
+print("Starting connection");
+let connection = new WebSocket("ws://127.0.0.1:8000");
+addEvents(connection);
+
+function addEvents(ws) {
+    ws.addEventListener("open", (e) => {
+        print("Connected to server");
+    });
+
+    ws.addEventListener("message", (e) => {
+        let data = JSON.parse(e.data);
+        switch (Object.keys(data)[0]) {
+            case "StartGame":
+                let sgData = data.StartGame;
+                mark = squareFromString(sgData.mark);
+
+                turn = sgData.first;
+                playing = true;
+                print("playing game, mark = " + sgData.mark + ", first = " + sgData.first);
+                break;
+            case "Move":
+                let mvData = data.Move;
+                
+                board[mvData.pos.y*3 + mvData.pos.x] = squareFromString(mvData.mark);
+                turn = true;
+                print("Received move at x: " + mvData.pos.x + ", y: " + mvData.pos.y);
+                break;
+            case "GameOver":
+                let goData = data.GameOver;
+                if (goData.draw) {
+                    print("Game over, was a draw");
+                } else {
+                    if (goData.winner) {
+                        print("Game over, you won!");
+                    } else {
+                        print("Game over, you lost");
+                    }
+                }
+                playing = false;
+                break;
+            default:
+                if (data == "PlayerLeft") {
+                    print("Player disconnected from game, so game over");
+                    playing = false;
+                } else {
+                    console.log("unfound lol - ", data);
+                    debugger;
+                }
+        }
+    });
+    ws.addEventListener("error", (e) => {
+        print("Received error");
+    });
+
+    ws.addEventListener("close", (e) => {
+        console.log(e);
+        print("Connection to server closed");
+    });
+}
+
+var canvas = document.querySelector("#canvas");
+var ctx = canvas.getContext("2d");
+
+const WIDTH = 500;
+const HEIGHT = 500;
+
+var turn = false;
+
+var selectedSquare = null;
+
+var playing = false;
+var mark = null;
+
+canvas.addEventListener("mousedown", (e) => {
+    setSelSquare(e.clientX, e.clientY);
+
+    if (playing && selectedSquare != null && board[selectedSquare] == squareEnum.EMPTY && turn) {
+        let x = selectedSquare % 3;
+        let y = Math.floor(selectedSquare / 3);
+        let message = {Move: {pos: {x, y}}};
+        connection.send(JSON.stringify(message));
+        print("Sent move at x: " + x + ", y: " + y);
+
+        //also make move locally
+        board[selectedSquare] = mark;
+        turn = false;
+    }
+});
+
+canvas.addEventListener("mousemove", (e) => {
+    setSelSquare(e.clientX, e.clientY);
+});
+
+function setSelSquare(x, y) {
+    mouse.x = x;
+    mouse.y = y;
+    
+    if (mouse.x <= WIDTH && mouse.y <= HEIGHT) {
+        let x = Math.floor(mouse.x/WIDTH*3);
+        let y = Math.floor(mouse.y/HEIGHT*3);
+        
+        selectedSquare = y*3 + x;
+    } else {
+        selectedSquare = null;
+    }
+}
+
+canvas.addEventListener("mouseleave", (e) => {
+    mouse.x = 0;
+    mouse.y = 0;
+    selectedSquare = null;
+});
+
+document.getElementById("reconnect-button").addEventListener("click", (e) => {
+    if (connection.readyState == connection.OPEN) {
+        print("Disconnecting and reconnecting");
+        connection.close();
+    } else {
+        print("Trying to reconnect");
+    }
+    connection = new WebSocket("ws://127.0.0.1:8000");
+    addEvents(connection);
+
+    setupBoard();
+});
+
+var squareEnum = {
+    EMPTY: 1,
+    CROSS: 2,
+    NOUGHT: 3
+};
+
+function squareToString(square) {
+    switch (square) {
+        case squareEnum.EMPTY:
+            return "Empty";
+        case squareEnum.CROSS:
+            return "Cross";
+        case squareEnum.NOUGHT:
+            return "Nought";
+    }
+}
+
+function squareFromString(str) {
+    switch (str) {
+        case "Empty":
+            return squareEnum.EMPTY;
+        case "Cross":
+            return squareEnum.CROSS;
+        case "Nought":
+            return squareEnum.NOUGHT;
+    }
+}
+
+var mouse = {
+    x: 0,
+    y: 0
+};
+
+var board;
+
+function setup() {
+    resize();
+    setupBoard();
+    update();
+}
+
+function setupBoard() {
+    board = [];
+    board.length = 9;
+    board.fill(squareEnum.EMPTY);
+}
+
+function clearBoard() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function update() {
+    clearBoard();
+    drawBoard();
+    
+    requestAnimationFrame(update);
+}
+
+setup();
+
+//prints a messages to the info box
+function print(message) {
+    let para = document.createElement("DIV");
+    para.innerHTML = message;
+    document.querySelector("#info-box").appendChild(para);
+}
+
+function resize() {
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+}
+
+//draws the board
+function drawBoard() {
+    //clear canvas
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+    
+    drawLines();
+    
+    for (let x=0;x<3;x++) {
+        for (let y=0;y<3;y++) {
+            switch (board[y*3 + x]) {
+                case squareEnum.CROSS:
+                    drawPiece(true, x, y);
+                    break;
+                case squareEnum.NOUGHT:
+                    drawPiece(false, x, y);
+                    break;
+                case squareEnum.EMPTY:
+                    if (playing && turn && selectedSquare != null && selectedSquare == y*3 + x) {
+                        ctx.globalAlpha = 0.5;
+                        let playerCross = mark == squareEnum.CROSS;
+                        drawPiece(playerCross, x, y);
+                        ctx.globalAlpha = 1;
+                    }
+                    break;
+            }
+        }
+    }
+}
+
+//draws the lines of the board
+function drawLines() {
+    let wid3 = WIDTH/3;
+    let hei3 = HEIGHT/3;
+    
+    //draw vertical lines
+    drawLine(wid3, 0, wid3, HEIGHT);
+    drawLine(2*wid3, 0, 2*wid3, HEIGHT);
+    
+    //draw horizontal lines
+    drawLine(0, hei3, WIDTH, hei3);
+    drawLine(0, 2*hei3, WIDTH, 2*hei3);
+}
+
+//simple line between 2 points
+function drawLine(x1, y1, x2, y2) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+}
+
+//cross is boolean - true for cross, false for nought
+//x and y are the board coords - between 0 and 2
+function drawPiece(cross, x, y) {
+    let xCoord = x * WIDTH/3 + WIDTH/6;
+    let yCoord = y * WIDTH/3 + WIDTH/6;
+    
+    if (cross) {
+        drawCross(xCoord, yCoord);
+    } else {
+        drawNought(xCoord, yCoord);
+    }
+}
+
+//draws a nought centred on x and y
+function drawNought(x, y) {
+    ctx.beginPath();
+    ctx.arc(x, y, WIDTH/6, 0, 2*Math.PI);
+    ctx.stroke();
+}
+
+//draws a cross centred on x and y
+function drawCross(x, y) {
+    ctx.beginPath();
+    drawLine(x-WIDTH/6, y-WIDTH/6, x+WIDTH/6, y+WIDTH/6);
+    
+    drawLine(x-WIDTH/6, y+WIDTH/6, x+WIDTH/6, y-WIDTH/6);
+    
+    ctx.stroke();
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+[package]
+name = "tictactoe-threads"
+version = "0.1.0"
+authors = ["Tristan Phease"]
+edition = "2018"
+
+[dependencies]
+tungstenite = "0.13.0"
+serde = "1.0"
+serde_json = "1.0"
+fastrand = "1.4.1"
+common = {path = "../common"}

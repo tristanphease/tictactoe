@@ -1,0 +1,9 @@
+[package]
+name = "common"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+fastrand = "1.4.1"
+serde_json = "1.0.64"
+serde = { version = "1.0.125", features = ["derive"] }
