@@ -3,6 +3,7 @@ name = "tictactoe-threads"
 version = "0.1.0"
 authors = ["Tristan Phease"]
 edition = "2018"
+license = "MIT"
 
 [dependencies]
 tungstenite = "0.13.0"
